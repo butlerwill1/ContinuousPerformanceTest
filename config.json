@@ -1,0 +1,17 @@
+{
+  "stimulus_duration_ms": 300,
+  "response_window_ms": 1000,
+  "inter_stimulus_interval_ms": 700,
+  "total_trials": 800,
+  "target_probability": 0.15,
+  "fullscreen": true,
+  "font_size": 96,
+  "background_color": [0, 0, 0],
+  "stimulus_color": [255, 255, 255],
+  "response_key": "space",
+  "practice_trials": 20,
+  "show_fixation": true,
+  "fixation_symbol": "+",
+  "random_colors": false
+}
+
