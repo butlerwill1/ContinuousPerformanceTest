@@ -118,37 +118,171 @@ class AXCPTGame:
                         self.quit_game()
     
     def show_end_screen(self):
-        """Display end screen."""
+        """Display comprehensive end screen with performance summary."""
         self.screen.fill(self.bg_color)
-        
+
+        # Get performance stats
         stats = self.logger.get_summary_stats()
-        
-        lines = [
-            "Task Complete!",
-            "",
-            f"Total Trials: {stats.get('total_trials', 0)}",
-            f"Accuracy: {stats.get('accuracy', 0):.1%}",
-            "",
-            "Data has been saved.",
-            "",
-            "Press any key to exit..."
-        ]
-        
-        y_offset = self.height // 3
-        for line in lines:
-            text_surface = self.instruction_font.render(line, True, self.stim_color)
-            text_rect = text_surface.get_rect(center=(self.center[0], y_offset))
-            self.screen.blit(text_surface, text_rect)
-            y_offset += 45
-        
+
+        # Get tracking stats if available
+        tracking_stats = None
+        if self.webcam_tracker and self.tracking_logger:
+            tracking_stats = self.tracking_logger.calculate_session_summary()
+
+        # Title - check if session was completed or ended early
+        total_trials = stats.get('total_trials', 0)
+        expected_trials = len(self.stimulus_sequence)
+        completed_early = total_trials < expected_trials
+
+        title_font = pygame.font.Font(None, 64)
+        title_text = "Session Summary" if completed_early else "Task Complete!"
+        title = title_font.render(title_text, True, self.stim_color)
+        title_rect = title.get_rect(center=(self.center[0], 60))
+        self.screen.blit(title, title_rect)
+
+        # Show early completion notice if applicable
+        if completed_early:
+            subtitle_font = pygame.font.Font(None, 28)
+            subtitle = subtitle_font.render(
+                f"(Ended early: {total_trials}/{expected_trials} trials completed)",
+                True, (255, 255, 100)  # Yellow color
+            )
+            subtitle_rect = subtitle.get_rect(center=(self.center[0], 95))
+            self.screen.blit(subtitle, subtitle_rect)
+
+        # Create two columns: Performance (left) and Tracking (right)
+        left_x = self.width // 4
+        right_x = 3 * self.width // 4
+        start_y = 150 if completed_early else 140
+
+        # === LEFT COLUMN: Performance Metrics ===
+        self._draw_section_header("Performance", left_x, start_y)
+        y = start_y + 50
+
+        # Overall accuracy
+        accuracy = stats.get('accuracy', 0)
+        accuracy_color = self._get_performance_color(accuracy)
+        self._draw_stat_line(f"Overall Accuracy: {accuracy:.1%}", left_x, y, accuracy_color)
+        y += 40
+
+        # Total trials
+        self._draw_stat_line(f"Total Trials: {stats.get('total_trials', 0)}", left_x, y)
+        y += 40
+
+        # Reaction times
+        median_rt = stats.get('median_rt_ms')
+        mean_rt = stats.get('mean_rt_ms')
+        if median_rt is not None:
+            self._draw_stat_line(f"Median RT: {median_rt:.0f} ms", left_x, y)
+            y += 35
+        if mean_rt is not None:
+            self._draw_stat_line(f"Mean RT: {mean_rt:.0f} ms", left_x, y)
+            y += 45
+
+        # Accuracy by trial type
+        self._draw_stat_line("By Trial Type:", left_x, y, size=28)
+        y += 35
+
+        by_type = stats.get('by_trial_type', {})
+        for trial_type in ['AX', 'BX', 'AY', 'BY']:
+            if trial_type in by_type:
+                type_stats = by_type[trial_type]
+                type_acc = type_stats['correct'] / type_stats['total'] if type_stats['total'] > 0 else 0
+                type_color = self._get_performance_color(type_acc)
+                self._draw_stat_line(
+                    f"  {trial_type}: {type_acc:.1%} ({type_stats['correct']}/{type_stats['total']})",
+                    left_x, y, type_color, size=26
+                )
+                y += 32
+
+        # === RIGHT COLUMN: Tracking Metrics (if available) ===
+        if tracking_stats and tracking_stats.get('total_frames_tracked', 0) > 0:
+            self._draw_section_header("Attention Tracking", right_x, start_y)
+            y = start_y + 50
+
+            # Blink metrics
+            total_blinks = tracking_stats.get('total_blinks', 0)
+            blink_rate = tracking_stats.get('blink_rate_per_minute', 0)
+            self._draw_stat_line(f"Total Blinks: {total_blinks}", right_x, y)
+            y += 35
+            self._draw_stat_line(f"Blink Rate: {blink_rate:.1f}/min", right_x, y)
+            y += 40
+
+            # Head movement
+            head_stability = tracking_stats.get('mean_head_distance', 0)
+            self._draw_stat_line(f"Head Stability: {head_stability:.1f}", right_x, y)
+            y += 35
+
+            # Looking away
+            looking_away = tracking_stats.get('total_looking_away_events', 0)
+            self._draw_stat_line(f"Looking Away: {looking_away} times", right_x, y)
+            y += 40
+
+            # Engagement score
+            engagement = tracking_stats.get('engagement_score', 0)
+            engagement_color = self._get_performance_color(engagement)
+            self._draw_stat_line(f"Engagement: {engagement:.1%}", right_x, y, engagement_color)
+            y += 35
+
+            # Fatigue indicator
+            fatigue = tracking_stats.get('fatigue_indicator', 0)
+            fatigue_color = self._get_fatigue_color(fatigue)
+            self._draw_stat_line(f"Fatigue: {fatigue:.1%}", right_x, y, fatigue_color)
+
+        # Bottom message
+        bottom_y = self.height - 80
+        self._draw_stat_line("Data has been saved to results/ folder", self.center[0], bottom_y, size=28)
+        self._draw_stat_line("Press any key to exit...", self.center[0], bottom_y + 35, size=28)
+
         pygame.display.flip()
-        
+
         # Wait for any key
         waiting = True
         while waiting:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT or event.type == pygame.KEYDOWN:
                     waiting = False
+
+    def _draw_section_header(self, text: str, x: int, y: int):
+        """Draw a section header on the end screen."""
+        header_font = pygame.font.Font(None, 42)
+        header_surface = header_font.render(text, True, self.stim_color)
+        header_rect = header_surface.get_rect(center=(x, y))
+        self.screen.blit(header_surface, header_rect)
+
+        # Underline
+        line_y = y + 20
+        pygame.draw.line(self.screen, self.stim_color,
+                        (x - 100, line_y), (x + 100, line_y), 2)
+
+    def _draw_stat_line(self, text: str, x: int, y: int,
+                       color: Optional[Tuple[int, int, int]] = None, size: int = 30):
+        """Draw a single stat line on the end screen."""
+        if color is None:
+            color = self.stim_color
+
+        stat_font = pygame.font.Font(None, size)
+        stat_surface = stat_font.render(text, True, color)
+        stat_rect = stat_surface.get_rect(center=(x, y))
+        self.screen.blit(stat_surface, stat_rect)
+
+    def _get_performance_color(self, accuracy: float) -> Tuple[int, int, int]:
+        """Get color based on performance level (green=good, yellow=ok, red=poor)."""
+        if accuracy >= 0.85:
+            return (100, 255, 100)  # Green
+        elif accuracy >= 0.70:
+            return (255, 255, 100)  # Yellow
+        else:
+            return (255, 100, 100)  # Red
+
+    def _get_fatigue_color(self, fatigue: float) -> Tuple[int, int, int]:
+        """Get color based on fatigue level (green=low, yellow=medium, red=high)."""
+        if fatigue <= 0.3:
+            return (100, 255, 100)  # Green (low fatigue is good)
+        elif fatigue <= 0.6:
+            return (255, 255, 100)  # Yellow
+        else:
+            return (255, 100, 100)  # Red (high fatigue is bad)
     
     def get_random_color(self) -> Tuple[int, int, int]:
         """Generate a random bright color."""
@@ -310,9 +444,14 @@ class AXCPTGame:
                 self.clock.tick(60)
 
     def quit_game(self):
-        """Save data and quit."""
+        """Save data, show summary, and quit."""
         self.logger.save_to_csv()
         self._save_tracking_data()
+
+        # Show summary screen even when quitting early
+        if len(self.logger.trials) > 0:  # Only show if at least one trial was completed
+            self.show_end_screen()
+
         self._cleanup_tracking()
         pygame.quit()
         sys.exit()

@@ -114,11 +114,30 @@ class TrialLogger:
         """Calculate summary statistics from logged trials."""
         if not self.trials:
             return {}
-        
+
         total_trials = len(self.trials)
         responses = sum(1 for t in self.trials if t["response"] == 1)
         correct = sum(1 for t in self.trials if t["correct"] == 1)
-        
+
+        # Calculate reaction time statistics (only for trials with responses)
+        reaction_times = []
+        for t in self.trials:
+            rt = t["reaction_time_ms"]
+            # Handle None, empty string, or convert to float
+            if rt is not None and rt != "" and rt != "None":
+                try:
+                    reaction_times.append(float(rt))
+                except (ValueError, TypeError):
+                    pass  # Skip invalid values
+
+        if reaction_times:
+            sorted_rts = sorted(reaction_times)
+            median_rt = sorted_rts[len(sorted_rts) // 2]
+            mean_rt = sum(reaction_times) / len(reaction_times)
+        else:
+            median_rt = None
+            mean_rt = None
+
         # Calculate by trial type
         trial_types = {}
         for trial in self.trials:
@@ -128,12 +147,14 @@ class TrialLogger:
             trial_types[tt]["total"] += 1
             trial_types[tt]["correct"] += trial["correct"]
             trial_types[tt]["responses"] += trial["response"]
-        
+
         return {
             "total_trials": total_trials,
             "total_responses": responses,
             "total_correct": correct,
             "accuracy": correct / total_trials if total_trials > 0 else 0,
+            "median_rt_ms": median_rt,
+            "mean_rt_ms": mean_rt,
             "by_trial_type": trial_types
         }
 

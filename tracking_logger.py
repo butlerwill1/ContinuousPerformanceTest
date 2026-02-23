@@ -144,33 +144,43 @@ class TrackingLogger:
     def calculate_session_summary(self) -> Dict[str, Any]:
         """
         Calculate session-level summary statistics.
-        
+
         Returns:
             Dictionary of session-level metrics
         """
         if not self.enabled or self.session_stats['total_trials_tracked'] == 0:
             return self._get_empty_session_summary()
-        
+
         # Overall blink rate
         total_duration = 0
         if self.frame_data:
-            total_duration = (self.frame_data[-1].timestamp - 
+            total_duration = (self.frame_data[-1].timestamp -
                             self.frame_data[0].timestamp)
-        
-        overall_blink_rate = (self.session_stats['total_blinks'] / total_duration 
+
+        overall_blink_rate = (self.session_stats['total_blinks'] / total_duration
                              if total_duration > 0 else 0.0)
-        
-        # Head stability (lower variance = more stable)
+
+        # Convert to blinks per minute for display
+        blink_rate_per_minute = overall_blink_rate * 60.0
+
+        # Head stability metrics
+        mean_head_distance = 0.0
         mean_head_stability = 0.0
         if self.session_stats['head_distances']:
+            mean_head_distance = np.mean(self.session_stats['head_distances'])
             mean_head_stability = np.var(self.session_stats['head_distances'])
-        
+
+        # Count total looking away events from trial data
+        total_looking_away_events = sum(
+            trial.get('looking_away_count', 0) for trial in self.trial_data
+        )
+
         # Engagement score (derived metric: inverse of head movement + blink consistency)
         # Higher score = better engagement
         engagement_score = 0.0
         if mean_head_stability > 0:
             engagement_score = 1.0 / (1.0 + mean_head_stability)
-        
+
         # Fatigue indicator: compare first half vs second half blink rates
         fatigue_indicator = 0.0
         blink_rates = self.session_stats['blink_rates_over_time']
@@ -181,13 +191,14 @@ class TrackingLogger:
             # Positive value = increased blinking in second half (fatigue)
             if first_half_mean > 0:
                 fatigue_indicator = (second_half_mean - first_half_mean) / first_half_mean
-        
+
         return {
             'total_blinks': self.session_stats['total_blinks'],
             'total_frames_tracked': self.session_stats['total_frames'],
             'total_trials_tracked': self.session_stats['total_trials_tracked'],
-            'overall_blink_rate': overall_blink_rate,
-            'mean_head_stability': mean_head_stability,
+            'blink_rate_per_minute': blink_rate_per_minute,
+            'mean_head_distance': mean_head_distance,
+            'total_looking_away_events': total_looking_away_events,
             'engagement_score': engagement_score,
             'fatigue_indicator': fatigue_indicator,
             'session_duration_seconds': total_duration
@@ -199,8 +210,9 @@ class TrackingLogger:
             'total_blinks': 0,
             'total_frames_tracked': 0,
             'total_trials_tracked': 0,
-            'overall_blink_rate': 0.0,
-            'mean_head_stability': 0.0,
+            'blink_rate_per_minute': 0.0,
+            'mean_head_distance': 0.0,
+            'total_looking_away_events': 0,
             'engagement_score': 0.0,
             'fatigue_indicator': 0.0,
             'session_duration_seconds': 0.0
