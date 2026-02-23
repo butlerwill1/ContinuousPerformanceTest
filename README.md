@@ -121,6 +121,29 @@ Aggregate metrics for the entire session:
 - `fatigue_indicator`: Change in blink rate over time (positive = increased fatigue)
 - `session_duration_seconds`: Total tracking duration
 
+## Analyzing Results
+
+### Jupyter Notebook Analysis
+
+A comprehensive Jupyter notebook is provided for analyzing your results:
+
+```bash
+# Install analysis dependencies (if not already installed)
+pip install pandas matplotlib seaborn jupyter
+
+# Launch Jupyter
+jupyter notebook analyze_axcpt_results.ipynb
+```
+
+The notebook includes:
+- **Behavioral Performance Analysis**: Accuracy, reaction times, error patterns
+- **Tracking Data Visualization**: Blink rates, head movement, engagement metrics
+- **Combined Analysis**: Correlation between attention and performance
+- **Trial-by-Trial Deep Dive**: Detailed inspection of individual trials
+- **Professional Visualizations**: Publication-ready charts and graphs
+
+The notebook automatically loads the most recent session data from the `results/` folder.
+
 ## Controls
 
 - **SPACEBAR** (or configured key): Respond to target
