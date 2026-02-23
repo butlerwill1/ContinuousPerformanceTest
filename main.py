@@ -9,6 +9,8 @@ from typing import Optional, Tuple
 from utils import load_config, get_timestamp, ms_to_seconds, calculate_elapsed_ms
 from stimulus_generator import StimulusGenerator
 from logger import TrialLogger
+from webcam_tracker import WebcamTracker
+from tracking_logger import TrackingLogger
 
 
 class AXCPTGame:
@@ -18,43 +20,59 @@ class AXCPTGame:
         """Initialize the game."""
         self.config = load_config(config_path)
         self.logger = TrialLogger()
-        
+
+        # Initialize webcam tracking
+        tracking_config = self.config.get("webcam_tracking", {})
+        self.tracking_enabled = tracking_config.get("enabled", False)
+
+        if self.tracking_enabled:
+            self.webcam_tracker = WebcamTracker(
+                enabled=True,
+                camera_index=tracking_config.get("camera_index", 0)
+            )
+            self.tracking_logger = TrackingLogger(enabled=True)
+            print("Webcam tracking enabled")
+        else:
+            self.webcam_tracker = None
+            self.tracking_logger = None
+            print("Webcam tracking disabled")
+
         # Initialize Pygame
         pygame.init()
-        
+
         # Set up display
         if self.config["fullscreen"]:
             self.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
         else:
             self.screen = pygame.display.set_mode((800, 600))
-        
+
         pygame.display.set_caption("AX-CPT Task")
-        
+
         # Get screen dimensions
         self.width, self.height = self.screen.get_size()
         self.center = (self.width // 2, self.height // 2)
-        
+
         # Set up font
         self.font = pygame.font.Font(None, self.config["font_size"])
         self.instruction_font = pygame.font.Font(None, 36)
-        
+
         # Colors
         self.bg_color = tuple(self.config["background_color"])
         self.stim_color = tuple(self.config["stimulus_color"])
-        
+
         # Clock for frame timing
         self.clock = pygame.time.Clock()
-        
+
         # Response key
         self.response_key = getattr(pygame, f"K_{self.config['response_key'].upper()}")
-        
+
         # Generate stimulus sequence
         self.generator = StimulusGenerator(
             self.config["total_trials"],
             self.config["target_probability"]
         )
         self.stimulus_sequence = self.generator.generate_sequence()
-        
+
         # Trial state
         self.current_trial = 0
         self.previous_stimulus = None
@@ -171,16 +189,21 @@ class AXCPTGame:
         self.screen.fill(self.bg_color)
         pygame.display.flip()
 
-    def run_trial(self, stimulus: str) -> Tuple[int, int, Optional[float]]:
+    def run_trial(self, stimulus: str, trial_index: int) -> Tuple[int, int, Optional[float]]:
         """
         Run a single trial.
 
         Args:
             stimulus: The stimulus to display
+            trial_index: Index of current trial
 
         Returns:
-            Tuple of (response, correct, reaction_time_ms)
+            Tuple of (response, correct, reaction_time_ms, trial_type, stimulus_onset)
         """
+        # Start tracking for this trial
+        if self.tracking_enabled and self.webcam_tracker:
+            self.webcam_tracker.start_trial(trial_index)
+
         # Determine trial type
         trial_type = self.generator.get_trial_type(stimulus, self.previous_stimulus)
         is_target = self.generator.is_target_trial(trial_type)
@@ -202,6 +225,12 @@ class AXCPTGame:
         elapsed = 0
 
         while elapsed < total_duration:
+            # Process webcam frame
+            if self.tracking_enabled and self.webcam_tracker:
+                frame_metrics = self.webcam_tracker.process_frame(trial_index)
+                if frame_metrics and self.tracking_logger:
+                    self.tracking_logger.log_frame(frame_metrics)
+
             # Handle events
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -241,9 +270,15 @@ class AXCPTGame:
         """Run the main experimental session."""
         for i, stimulus in enumerate(self.stimulus_sequence):
             # Run trial
-            response, correct, rt_ms, trial_type, onset = self.run_trial(stimulus)
+            response, correct, rt_ms, trial_type, onset = self.run_trial(stimulus, i)
 
-            # Log trial
+            # Get trial-level tracking data
+            tracking_data = None
+            if self.tracking_enabled and self.webcam_tracker and self.tracking_logger:
+                tracking_data = self.webcam_tracker.end_trial()
+                self.tracking_logger.log_trial(tracking_data)
+
+            # Log trial (with tracking data if available)
             self.logger.log_trial(
                 trial_index=i,
                 stimulus=stimulus,
@@ -252,7 +287,8 @@ class AXCPTGame:
                 response=response,
                 correct=correct,
                 reaction_time_ms=rt_ms,
-                stimulus_onset_timestamp=onset
+                stimulus_onset_timestamp=onset,
+                tracking_data=tracking_data
             )
 
             # Update previous stimulus
@@ -276,8 +312,30 @@ class AXCPTGame:
     def quit_game(self):
         """Save data and quit."""
         self.logger.save_to_csv()
+        self._save_tracking_data()
+        self._cleanup_tracking()
         pygame.quit()
         sys.exit()
+
+    def _save_tracking_data(self):
+        """Save all tracking data."""
+        if not self.tracking_enabled or not self.tracking_logger:
+            return
+
+        tracking_config = self.config.get("webcam_tracking", {})
+
+        # Save frame-level data
+        if tracking_config.get("save_frame_data", True):
+            self.tracking_logger.save_frame_data()
+
+        # Save session summary
+        if tracking_config.get("save_session_summary", True):
+            self.tracking_logger.save_session_summary()
+
+    def _cleanup_tracking(self):
+        """Release webcam and cleanup tracking resources."""
+        if self.webcam_tracker:
+            self.webcam_tracker.release()
 
     def run(self):
         """Run the complete experiment."""
@@ -285,8 +343,10 @@ class AXCPTGame:
             self.show_instructions()
             self.run_session()
             self.logger.save_to_csv()
+            self._save_tracking_data()
             self.show_end_screen()
         finally:
+            self._cleanup_tracking()
             pygame.quit()
 
 

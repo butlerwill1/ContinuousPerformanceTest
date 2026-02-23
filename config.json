@@ -10,8 +10,15 @@
   "stimulus_color": [255, 255, 255],
   "response_key": "space",
   "practice_trials": 20,
-  "show_fixation": true,
+  "show_fixation": false,
   "fixation_symbol": "+",
-  "random_colors": false
+  "random_colors": false,
+
+  "webcam_tracking": {
+    "enabled": true,
+    "camera_index": 0,
+    "save_frame_data": true,
+    "save_session_summary": true
+  }
 }
 

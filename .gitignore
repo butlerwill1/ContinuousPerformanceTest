@@ -11,9 +11,12 @@ __pycache__/
 *.so
 .Python
 
-# Results/Data files
-*.csv
-ax_cpt_results_*.csv
+# Results directory (contains all CSV output files)
+results/
+
+# MediaPipe model files
+*.task
+face_landmarker.task
 
 # IDE
 .vscode/
