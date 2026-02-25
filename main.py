@@ -4,13 +4,17 @@ Main game loop and rendering
 """
 import pygame
 import sys
+import os
+import shutil
 import random
 from typing import Optional, Tuple
-from utils import load_config, get_timestamp, ms_to_seconds, calculate_elapsed_ms
+from utils import load_config, get_timestamp, ms_to_seconds, calculate_elapsed_ms, get_filename_timestamp
 from stimulus_generator import StimulusGenerator
 from logger import TrialLogger
 from webcam_tracker import WebcamTracker
 from tracking_logger import TrackingLogger
+from questionnaire import PreTestQuestionnaire
+from session_metadata import SessionMetadata
 
 
 class AXCPTGame:
@@ -20,6 +24,11 @@ class AXCPTGame:
         """Initialize the game."""
         self.config = load_config(config_path)
         self.logger = TrialLogger()
+
+        # Session management
+        self.session_timestamp = None
+        self.session_dir = None
+        self.session_metadata = SessionMetadata()
 
         # Initialize webcam tracking
         tracking_config = self.config.get("webcam_tracking", {})
@@ -445,8 +454,15 @@ class AXCPTGame:
 
     def quit_game(self):
         """Save data, show summary, and quit."""
-        self.logger.save_to_csv()
-        self._save_tracking_data()
+        # Save data to session directory
+        if self.session_dir:
+            self.logger.save_to_csv(session_dir=self.session_dir)
+            self._save_tracking_data()
+            self.session_metadata.save_to_csv(self.session_dir)
+        else:
+            # Fallback if session_dir not set (shouldn't happen)
+            self.logger.save_to_csv()
+            self._save_tracking_data()
 
         # Show summary screen even when quitting early
         if len(self.logger.trials) > 0:  # Only show if at least one trial was completed
@@ -461,15 +477,18 @@ class AXCPTGame:
         if not self.tracking_enabled or not self.tracking_logger:
             return
 
+        if not self.session_dir:
+            return
+
         tracking_config = self.config.get("webcam_tracking", {})
 
         # Save frame-level data
         if tracking_config.get("save_frame_data", True):
-            self.tracking_logger.save_frame_data()
+            self.tracking_logger.save_frame_data(self.session_dir)
 
         # Save session summary
         if tracking_config.get("save_session_summary", True):
-            self.tracking_logger.save_session_summary()
+            self.tracking_logger.save_session_summary(self.session_dir)
 
     def _cleanup_tracking(self):
         """Release webcam and cleanup tracking resources."""
@@ -479,10 +498,40 @@ class AXCPTGame:
     def run(self):
         """Run the complete experiment."""
         try:
+            # Create session timestamp and directory
+            self.session_timestamp = get_filename_timestamp()
+            self.session_dir = f"results/{self.session_timestamp}"
+            os.makedirs(self.session_dir, exist_ok=True)
+
+            # Copy config file to session directory for reproducibility
+            shutil.copy('config.json', f'{self.session_dir}/config.json')
+            print(f"Session directory created: {self.session_dir}")
+
+            # Show pre-test questionnaire
+            questionnaire = PreTestQuestionnaire(
+                self.screen,
+                bg_color=tuple(self.config["background_color"]),
+                text_color=tuple(self.config["stimulus_color"])
+            )
+
+            metadata_responses = questionnaire.show(self.session_timestamp)
+
+            if metadata_responses is None:
+                # User skipped questionnaire - create empty metadata
+                metadata_responses = SessionMetadata.create_empty_metadata(self.session_timestamp)
+
+            self.session_metadata.set_metadata(metadata_responses)
+
+            # Run the test
             self.show_instructions()
             self.run_session()
-            self.logger.save_to_csv()
+
+            # Save all data
+            self.logger.save_to_csv(session_dir=self.session_dir)
             self._save_tracking_data()
+            self.session_metadata.save_to_csv(self.session_dir)
+
+            # Show summary
             self.show_end_screen()
         finally:
             self._cleanup_tracking()

@@ -3,10 +3,8 @@ Multi-level logging for webcam tracking data
 Handles frame-level, trial-level, and session-level data
 """
 import csv
-import os
 from typing import List, Dict, Any, Optional
 from dataclasses import asdict
-from utils import get_filename_timestamp
 from webcam_tracker import FrameMetrics
 import numpy as np
 
@@ -100,12 +98,13 @@ class TrackingLogger:
                 trial_metrics['blink_rate']
             )
     
-    def save_frame_data(self, filename: Optional[str] = None) -> str:
+    def save_frame_data(self, session_dir: str, filename: Optional[str] = None) -> str:
         """
         Save frame-level data to CSV.
 
         Args:
-            filename: Output filename (auto-generated if None)
+            session_dir: Directory for this session
+            filename: Output filename (defaults to 'tracking_frames.csv')
 
         Returns:
             Filename where data was saved
@@ -113,12 +112,8 @@ class TrackingLogger:
         if not self.enabled or not self.frame_data:
             return ""
 
-        # Create results directory if it doesn't exist
-        os.makedirs("results", exist_ok=True)
-
         if filename is None:
-            timestamp = get_filename_timestamp()
-            filename = f"results/ax_cpt_tracking_frames_{timestamp}.csv"
+            filename = f"{session_dir}/tracking_frames.csv"
 
         with open(filename, 'w', newline='') as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=self.FRAME_HEADERS)
@@ -218,12 +213,13 @@ class TrackingLogger:
             'session_duration_seconds': 0.0
         }
     
-    def save_session_summary(self, filename: Optional[str] = None) -> str:
+    def save_session_summary(self, session_dir: str, filename: Optional[str] = None) -> str:
         """
         Save session-level summary to CSV.
 
         Args:
-            filename: Output filename (auto-generated if None)
+            session_dir: Directory for this session
+            filename: Output filename (defaults to 'tracking_session.csv')
 
         Returns:
             Filename where data was saved
@@ -231,12 +227,8 @@ class TrackingLogger:
         if not self.enabled:
             return ""
 
-        # Create results directory if it doesn't exist
-        os.makedirs("results", exist_ok=True)
-
         if filename is None:
-            timestamp = get_filename_timestamp()
-            filename = f"results/ax_cpt_tracking_session_{timestamp}.csv"
+            filename = f"{session_dir}/tracking_session.csv"
 
         summary = self.calculate_session_summary()
 

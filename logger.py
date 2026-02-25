@@ -88,27 +88,31 @@ class TrialLogger:
 
         self.trials.append(trial_data)
     
-    def save_to_csv(self, filename: Optional[str] = None):
+    def save_to_csv(self, session_dir: Optional[str] = None, filename: Optional[str] = None):
         """
         Save logged trials to CSV file.
 
         Args:
-            filename: Output filename (auto-generated if None)
+            session_dir: Directory for this session (auto-generated if None)
+            filename: Output filename (defaults to 'trial_data.csv')
         """
-        # Create results directory if it doesn't exist
-        os.makedirs("results", exist_ok=True)
+        # Create session directory if not provided
+        if session_dir is None:
+            timestamp = get_filename_timestamp()
+            session_dir = f"results/{timestamp}"
+
+        os.makedirs(session_dir, exist_ok=True)
 
         if filename is None:
-            timestamp = get_filename_timestamp()
-            filename = f"results/ax_cpt_results_{timestamp}.csv"
+            filename = f"{session_dir}/trial_data.csv"
 
         with open(filename, 'w', newline='') as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=self.HEADERS)
             writer.writeheader()
             writer.writerows(self.trials)
 
-        print(f"Data saved to: {filename}")
-        return filename
+        print(f"Trial data saved to: {filename}")
+        return session_dir
     
     def get_summary_stats(self) -> Dict[str, Any]:
         """Calculate summary statistics from logged trials."""
