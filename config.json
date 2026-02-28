@@ -2,7 +2,7 @@
   "stimulus_duration_ms": 300,
   "response_window_ms": 1000,
   "inter_stimulus_interval_ms": 700,
-  "total_trials": 800,
+  "session_duration_minutes": 20,
   "target_probability": 0.15,
   "fullscreen": true,
   "font_size": 96,

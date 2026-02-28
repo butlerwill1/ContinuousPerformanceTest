@@ -75,9 +75,22 @@ class AXCPTGame:
         # Response key
         self.response_key = getattr(pygame, f"K_{self.config['response_key'].upper()}")
 
+        # Calculate total trials from session duration
+        time_per_trial_ms = (
+            self.config["stimulus_duration_ms"] +
+            self.config["response_window_ms"] +
+            self.config["inter_stimulus_interval_ms"]
+        )
+        session_duration_ms = self.config["session_duration_minutes"] * 60 * 1000
+        total_trials = int(session_duration_ms / time_per_trial_ms)
+
+        print(f"Session duration: {self.config['session_duration_minutes']} minutes")
+        print(f"Time per trial: {time_per_trial_ms}ms")
+        print(f"Calculated trials: {total_trials}")
+
         # Generate stimulus sequence
         self.generator = StimulusGenerator(
-            self.config["total_trials"],
+            total_trials,
             self.config["target_probability"]
         )
         self.stimulus_sequence = self.generator.generate_sequence()
