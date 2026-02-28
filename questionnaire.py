@@ -37,6 +37,7 @@ class PreTestQuestionnaire:
                 'section': 'ADHD Medication',
                 'fields': [
                     {'key': 'adhd_med_taken', 'prompt': 'Taken today? (y/n)', 'type': 'yesno'},
+                    {'key': 'adhd_med_mg', 'prompt': 'Dose in mg', 'type': 'number', 'depends_on': 'adhd_med_taken'},
                     {'key': 'hours_since_med', 'prompt': 'Hours since dose', 'type': 'number', 'depends_on': 'adhd_med_taken'}
                 ]
             },
@@ -48,9 +49,10 @@ class PreTestQuestionnaire:
                 ]
             },
             {
-                'section': 'Substances',
+                'section': 'Caffeine',
                 'fields': [
-                    {'key': 'caffeine_hours_ago', 'prompt': 'Hours since caffeine (blank if none)', 'type': 'number'}
+                    {'key': 'caffeine_mg', 'prompt': 'Caffeine in mg (blank if none)', 'type': 'number', 'hint': 'Green tea ~25mg, Black tea ~50mg, Coffee ~95mg'},
+                    {'key': 'caffeine_hours_ago', 'prompt': 'Hours since caffeine', 'type': 'number', 'depends_on': 'caffeine_mg'}
                 ]
             },
             {
@@ -187,14 +189,23 @@ class PreTestQuestionnaire:
             prompt_rect = prompt_text.get_rect(center=(self.center[0], y))
             self.screen.blit(prompt_text, prompt_rect)
 
+            # Hint text (if available)
+            if 'hint' in field:
+                y = 200
+                hint_text = self.small_font.render(field['hint'], True, (150, 200, 150))
+                hint_rect = hint_text.get_rect(center=(self.center[0], y))
+                self.screen.blit(hint_text, hint_rect)
+                y = 260
+            else:
+                y = 240
+
             # Input box
-            y = 240
             input_display = self.text_font.render(f"> {input_text}_", True, (255, 255, 100))
             input_rect = input_display.get_rect(center=(self.center[0], y))
             self.screen.blit(input_display, input_rect)
 
             # Help text
-            y = 320
+            y += 80
             help_text = self.small_font.render("ENTER to submit | ESC to skip questionnaire", True, (150, 150, 150))
             help_rect = help_text.get_rect(center=(self.center[0], y))
             self.screen.blit(help_text, help_rect)
