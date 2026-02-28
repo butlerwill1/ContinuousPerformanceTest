@@ -305,7 +305,15 @@ class AXCPTGame:
             return (255, 255, 100)  # Yellow
         else:
             return (255, 100, 100)  # Red (high fatigue is bad)
-    
+
+    def _format_duration(self, seconds: float) -> str:
+
+        if seconds < 60:
+            return f"{int(round(seconds))}s"
+        else:
+            minutes = int(round(seconds / 60))
+            return f"{minutes}m"
+
     def get_random_color(self) -> Tuple[int, int, int]:
         """Generate a random bright color."""
         # Generate bright, saturated colors
@@ -467,6 +475,10 @@ class AXCPTGame:
 
     def quit_game(self):
         """Save data, show summary, and quit."""
+        # Rename folder with actual duration (even if quit early)
+        if self.session_dir and len(self.logger.trials) > 0:
+            self._rename_session_folder_with_duration()
+
         # Save data to session directory
         if self.session_dir:
             self.logger.save_to_csv(session_dir=self.session_dir)
@@ -508,6 +520,41 @@ class AXCPTGame:
         if self.webcam_tracker:
             self.webcam_tracker.release()
 
+    def _rename_session_folder_with_duration(self):
+        """
+        Rename session folder to include actual duration based on trials completed.
+        Calculates duration from: trials_completed × time_per_trial
+        """
+        if not self.session_dir:
+            return
+
+        # Calculate duration from trials completed
+        trials_completed = len(self.logger.trials)
+        if trials_completed == 0:
+            return  # No trials, don't rename
+
+        time_per_trial_ms = (
+            self.config["stimulus_duration_ms"] +
+            self.config["response_window_ms"] +
+            self.config["inter_stimulus_interval_ms"]
+        )
+        actual_duration_seconds = (trials_completed * time_per_trial_ms) / 1000
+
+        # Format duration
+        duration_str = self._format_duration(actual_duration_seconds)
+
+        # Create new folder name with duration
+        old_dir = self.session_dir
+        new_dir = f"{self.session_dir}_{duration_str}"
+
+        # Rename the folder
+        try:
+            os.rename(old_dir, new_dir)
+            self.session_dir = new_dir
+            print(f"Session folder renamed to: {new_dir}")
+        except OSError as e:
+            print(f"Warning: Could not rename session folder: {e}")
+
     def run(self):
         """Run the complete experiment."""
         try:
@@ -539,7 +586,10 @@ class AXCPTGame:
             self.show_instructions()
             self.run_session()
 
-            # Save all data
+            # Rename folder with actual duration
+            self._rename_session_folder_with_duration()
+
+            # Save all data (to renamed folder)
             self.logger.save_to_csv(session_dir=self.session_dir)
             self._save_tracking_data()
             self.session_metadata.save_to_csv(self.session_dir)
