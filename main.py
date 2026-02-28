@@ -76,21 +76,25 @@ class AXCPTGame:
         self.response_key = getattr(pygame, f"K_{self.config['response_key'].upper()}")
 
         # Calculate total trials from session duration
-        time_per_trial_ms = (
+        # Note: In AX-CPT, each "trial" consists of a cue-probe pair (2 stimuli)
+        # Each stimulus takes: stimulus_duration + response_window + ISI
+        time_per_stimulus_ms = (
             self.config["stimulus_duration_ms"] +
             self.config["response_window_ms"] +
             self.config["inter_stimulus_interval_ms"]
         )
+        time_per_trial_pair_ms = time_per_stimulus_ms * 2  # Cue + Probe
         session_duration_ms = self.config["session_duration_minutes"] * 60 * 1000
-        total_trials = int(session_duration_ms / time_per_trial_ms)
+        total_trial_pairs = int(session_duration_ms / time_per_trial_pair_ms)
 
         print(f"Session duration: {self.config['session_duration_minutes']} minutes")
-        print(f"Time per trial: {time_per_trial_ms}ms")
-        print(f"Calculated trials: {total_trials}")
+        print(f"Time per stimulus: {time_per_stimulus_ms}ms")
+        print(f"Time per cue-probe pair: {time_per_trial_pair_ms}ms")
+        print(f"Calculated cue-probe pairs: {total_trial_pairs}")
 
         # Generate stimulus sequence
         self.generator = StimulusGenerator(
-            total_trials,
+            total_trial_pairs,
             self.config["target_probability"]
         )
         self.stimulus_sequence = self.generator.generate_sequence()
