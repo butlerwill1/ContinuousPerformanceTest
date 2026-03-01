@@ -1,6 +1,10 @@
 """
-Multi-level logging for webcam tracking data
-Handles frame-level, trial-level, and session-level data
+Multi-level logging for webcam tracking data.
+
+Data Hierarchy:
+- FRAME: Single webcam capture (~60 per second). Contains head pose, eye state at one moment.
+- TRIAL: One cue-probe pair (~4 seconds). Aggregates ~240 frames into blink count, head movement stats.
+- SESSION: Complete test run (~20 minutes). Aggregates ~300 trials into overall performance metrics.
 """
 import csv
 from typing import List, Dict, Any, Optional
@@ -10,9 +14,16 @@ import numpy as np
 
 
 class TrackingLogger:
-    """Logs tracking data at three levels of granularity."""
-    
-    # Headers for frame-level data (high frequency)
+    """
+    Logs tracking data at three levels of granularity.
+
+    Levels:
+    - Frame-level: Raw data from each webcam capture (~60 FPS)
+    - Trial-level: Aggregated metrics per trial (one cue-probe pair)
+    - Session-level: Overall statistics for entire test session
+    """
+
+    # Headers for frame-level data (one row per webcam frame, ~60 per second)
     FRAME_HEADERS = [
         "timestamp",
         "trial_index",
@@ -27,7 +38,7 @@ class TrackingLogger:
         "is_blinking"
     ]
     
-    # Headers for trial-level data (aggregated per trial)
+    # Headers for trial-level data (one row per trial, aggregated from ~240 frames)
     TRIAL_HEADERS = [
         "blink_count",
         "blink_rate",
@@ -39,8 +50,8 @@ class TrackingLogger:
     
     def __init__(self, enabled: bool = True):
         """
-        Initialize tracking logger.
-        
+        Initialize tracking logger. Called once in main.py at startup.
+
         Args:
             enabled: Whether tracking logging is enabled
         """
@@ -50,7 +61,7 @@ class TrackingLogger:
         self.frame_data: List[FrameMetrics] = []
         self.trial_data: List[Dict[str, Any]] = []
         
-        # Session-level accumulators
+        # Session-level accumulators (aggregated across all trials)
         self.session_stats = {
             'total_blinks': 0,
             'total_frames': 0,
@@ -61,10 +72,12 @@ class TrackingLogger:
     
     def log_frame(self, frame_metrics: FrameMetrics):
         """
-        Log a single frame of tracking data.
-        
+        Log a single FRAME of tracking data. Called ~60 times per second during trials in main.py.
+
+        A frame = one webcam capture with head position, eye state at a single moment in time.
+
         Args:
-            frame_metrics: Metrics from a single frame
+            frame_metrics: Metrics from webcam_tracker.process_frame()
         """
         if not self.enabled or frame_metrics is None:
             return
@@ -74,10 +87,12 @@ class TrackingLogger:
     
     def log_trial(self, trial_metrics: Dict[str, Any]):
         """
-        Log aggregated trial-level metrics.
-        
+        Log aggregated TRIAL-level metrics. Called once per trial in main.py after trial ends.
+
+        A trial = one cue-probe pair (~4 seconds, ~240 frames). Metrics are aggregated from all frames.
+
         Args:
-            trial_metrics: Dictionary of trial-level metrics
+            trial_metrics: Dictionary from webcam_tracker.end_trial() (blink count, head movement variance, etc.)
         """
         if not self.enabled:
             return
@@ -100,14 +115,14 @@ class TrackingLogger:
     
     def save_frame_data(self, session_dir: str, filename: Optional[str] = None) -> str:
         """
-        Save frame-level data to CSV.
+        Save all frame-level data to CSV. Called once at end of session in main.py.
 
         Args:
-            session_dir: Directory for this session
-            filename: Output filename (defaults to 'tracking_frames.csv')
+            session_dir: Session directory path
+            filename: Optional custom filename (default: 'tracking_frames.csv')
 
         Returns:
-            Filename where data was saved
+            Path to saved file
         """
         if not self.enabled or not self.frame_data:
             return ""
@@ -129,19 +144,21 @@ class TrackingLogger:
     
     def get_trial_data(self) -> List[Dict[str, Any]]:
         """
-        Get trial-level data (to be merged with main trial logger).
-        
+        Get all trial-level data. Called by logger.py to merge with behavioral data.
+
         Returns:
-            List of trial-level tracking metrics
+            List of trial metrics from all trials
         """
         return self.trial_data
     
     def calculate_session_summary(self) -> Dict[str, Any]:
         """
-        Calculate session-level summary statistics.
+        Calculate SESSION-level summary statistics. Called by summary_report.py and save_session_summary().
+
+        A session = complete test run (~20 minutes, ~300 trials). Metrics are aggregated from all trials.
 
         Returns:
-            Dictionary of session-level metrics
+            Dictionary with blink rate, head movement, posture consistency, fatigue indicator
         """
         if not self.enabled or self.session_stats['total_trials_tracked'] == 0:
             return self._get_empty_session_summary()
@@ -215,14 +232,14 @@ class TrackingLogger:
     
     def save_session_summary(self, session_dir: str, filename: Optional[str] = None) -> str:
         """
-        Save session-level summary to CSV.
+        Save session-level summary to CSV. Called once at end of session in main.py.
 
         Args:
-            session_dir: Directory for this session
-            filename: Output filename (defaults to 'tracking_session.csv')
+            session_dir: Session directory path
+            filename: Optional custom filename (default: 'tracking_session.csv')
 
         Returns:
-            Filename where data was saved
+            Path to saved file
         """
         if not self.enabled:
             return ""

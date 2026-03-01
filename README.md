@@ -76,11 +76,29 @@ Edit `config.json` to customize task parameters:
 
 Results are automatically saved to CSV files with timestamps in the `results/` directory.
 
+### Data Hierarchy
+
+**Understanding the three levels of data:**
+
+- **FRAME**: Single webcam capture (~60 per second)
+  - Contains: Head position, eye state at one moment in time
+  - Example: At 12.345 seconds, head was at position (0.5, 0.2, 2.8), eyes open
+
+- **TRIAL**: One cue-probe pair (~4 seconds, ~240 frames)
+  - Contains: Aggregated metrics from all frames in that trial
+  - Example: During trial #42, participant blinked 3 times, head moved 0.15 units
+
+- **SESSION**: Complete test run (~20 minutes, ~300 trials)
+  - Contains: Overall statistics aggregated from all trials
+  - Example: Across entire session, average blink rate was 36/min, posture consistency 0.83
+
 ### Main Trial Data
-File: `results/ax_cpt_results_YYYY-MM-DDTHH-MM-SS.csv`
+File: `results/TIMESTAMP_DURATION/trial_data.csv`
+
+One row per trial (cue-probe pair). ~300 rows for a 20-minute session.
 
 **Behavioral Columns:**
-- `trial_index`: Trial number
+- `trial_index`: Trial number (one trial = one cue-probe pair)
 - `stimulus`: Letter shown (A, B, X, or Y)
 - `previous_stimulus`: Previous letter shown
 - `trial_type`: AX, BX, AY, BY, or NONE
@@ -89,34 +107,36 @@ File: `results/ax_cpt_results_YYYY-MM-DDTHH-MM-SS.csv`
 - `reaction_time_ms`: Response time in milliseconds (empty if no response)
 - `stimulus_onset_timestamp`: High-precision timestamp of stimulus onset
 
-**Tracking Columns (if enabled):**
-- `blink_count`: Number of blinks during trial
-- `blink_rate`: Blinks per second during trial
-- `mean_head_distance`: Average distance from camera (normalized)
-- `head_movement_variance`: Measure of head stability (lower = more stable)
+**Tracking Columns (if enabled, aggregated from ~240 frames per trial):**
+- `blink_count`: Number of blinks during this trial
+- `blink_rate`: Blinks per second during this trial
+- `mean_head_distance`: Average distance from camera during this trial
+- `head_movement_variance`: Head position variance during this trial (lower = more stable)
 - `looking_away_count`: Number of frames where head turned >30° away
-- `frames_tracked`: Number of frames successfully tracked
+- `frames_tracked`: Number of frames successfully tracked in this trial
 
 ### Frame-Level Tracking Data (if enabled)
-File: `results/ax_cpt_tracking_frames_YYYY-MM-DDTHH-MM-SS.csv`
+File: `results/TIMESTAMP_DURATION/tracking_frames.csv`
 
-High-frequency data (~30 Hz) for detailed analysis:
+High-frequency data (~60 FPS) for detailed analysis. Each row = one webcam frame. ~18,000 rows for a 20-minute session.
+
 - `timestamp`: Frame timestamp
-- `trial_index`: Associated trial number
-- `head_x`, `head_y`, `head_z`: Head position (normalized)
-- `head_pitch`, `head_yaw`, `head_roll`: Head orientation in degrees
-- `left_eye_aspect_ratio`, `right_eye_aspect_ratio`: Eye openness (lower = more closed)
-- `is_blinking`: Boolean indicating blink state
+- `trial_index`: Which trial this frame belongs to
+- `head_x`, `head_y`, `head_z`: Head position at this moment (z = distance from camera)
+- `head_pitch`, `head_yaw`, `head_roll`: Head orientation at this moment (degrees)
+- `left_eye_aspect_ratio`, `right_eye_aspect_ratio`: Eye openness at this moment (lower = more closed)
+- `is_blinking`: Whether eyes were closed at this moment
 
 ### Session Summary (if enabled)
-File: `results/ax_cpt_tracking_session_YYYY-MM-DDTHH-MM-SS.csv`
+File: `results/TIMESTAMP_DURATION/tracking_session.csv`
 
-Aggregate metrics for the entire session:
+Aggregate metrics for the entire session. One row total, aggregated from ~300 trials.
+
 - `total_blinks`: Total blinks across all trials
-- `total_frames_tracked`: Total frames processed
-- `total_trials_tracked`: Number of trials with tracking data
-- `blink_rate_per_minute`: Average blinks per minute
-- `mean_head_movement`: Overall head movement (lower = more stable)
+- `total_frames_tracked`: Total frames processed (~18,000 for 20-minute session)
+- `total_trials_tracked`: Number of trials with tracking data (~300)
+- `blink_rate_per_minute`: Average blinks per minute across entire session
+- `mean_head_movement`: Overall head movement across entire session (lower = more stable)
 - `posture_consistency`: Posture consistency metric (0-1, higher = better consistency)
 - `fatigue_indicator`: Change in blink rate over time (positive = increased fatigue)
 - `session_duration_seconds`: Total tracking duration
@@ -196,6 +216,8 @@ To run the task without webcam tracking, set in `config.json`:
 ### Future Enhancements (Tier 2/3)
 
 The architecture is designed to easily add:
+- **Blink duration**: Measure how long each blink lasts (longer blinks may indicate fatigue)
+- **PERCLOS (Percentage of Eye Closure)**: Percentage of time eyes are >80% closed (drowsiness indicator)
 - **Gaze tracking**: Where on screen the participant is looking
 - **Pupil dilation**: Cognitive load and arousal measurement
 - **Facial expressions**: Emotion detection (frustration, boredom)
