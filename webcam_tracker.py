@@ -348,7 +348,7 @@ class WebcamTracker:
         head_z_values = [f.head_z for f in self.frame_buffer]
         mean_head_distance = np.mean(head_z_values)
 
-        # Head movement variance (stability metric)
+        # Head movement variance (used for posture consistency metric)
         head_x_values = [f.head_x for f in self.frame_buffer]
         head_y_values = [f.head_y for f in self.frame_buffer]
         head_movement_variance = np.var(head_x_values) + np.var(head_y_values)

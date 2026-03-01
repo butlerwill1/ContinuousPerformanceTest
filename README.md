@@ -115,9 +115,9 @@ Aggregate metrics for the entire session:
 - `total_blinks`: Total blinks across all trials
 - `total_frames_tracked`: Total frames processed
 - `total_trials_tracked`: Number of trials with tracking data
-- `overall_blink_rate`: Average blinks per second
-- `mean_head_stability`: Overall head movement variance
-- `engagement_score`: Derived metric (0-1, higher = better engagement)
+- `blink_rate_per_minute`: Average blinks per minute
+- `mean_head_movement`: Overall head movement (lower = more stable)
+- `posture_consistency`: Posture consistency metric (0-1, higher = better consistency)
 - `fatigue_indicator`: Change in blink rate over time (positive = increased fatigue)
 - `session_duration_seconds`: Total tracking duration
 
@@ -171,7 +171,7 @@ The task now includes **optional webcam-based behavioral tracking** using MediaP
 This data enables analysis of:
 - **Attention lapses**: Correlation between looking away and missed targets
 - **Fatigue**: Increased blink rate over time
-- **Engagement**: Head stability and posture changes
+- **Posture Consistency**: Head movement and posture changes
 - **Restlessness**: Head movement patterns (relevant for ADHD research)
 - **Error prediction**: Behavioral markers before incorrect responses
 
@@ -208,13 +208,27 @@ The architecture is designed to easily add:
   ├── main.py                    # Main game loop and rendering
   ├── config.json                # Configuration parameters
   ├── stimulus_generator.py      # Trial sequence generation
-  ├── logger.py                  # CSV data logging (behavioral + tracking)
+  ├── logger.py                  # CSV data logging (behavioral data)
   ├── utils.py                   # Timing and utility functions
   ├── webcam_tracker.py          # Webcam tracking with MediaPipe
   ├── tracking_logger.py         # Multi-level tracking data logger
-  ├── test_tracking.py           # Test script for tracking system
+  ├── questionnaire.py           # Pre-test questionnaire for metadata
+  ├── session_metadata.py        # Session metadata management
+  ├── summary_report.py          # ASCII summary report generator
   ├── requirements.txt           # Python dependencies
-  └── README.md                  # This file
+  ├── README.md                  # This file
+  ├── tests/                     # Test scripts
+  │   ├── test_tracking.py       # Test script for tracking system
+  │   ├── test_summary.py        # Test script for summary reports
+  │   └── test_generator.py      # Test script for stimulus generation
+  └── results/                   # Session data (timestamped folders)
+      └── YYYY-MM-DDTHH-MM-SS_XXm/
+          ├── config.json        # Session configuration snapshot
+          ├── trial_data.csv     # Behavioral performance data
+          ├── tracking_frames.csv      # Frame-level tracking data
+          ├── tracking_session.csv     # Session-level tracking summary
+          ├── session_metadata.csv     # Pre-test questionnaire responses
+          └── summary.txt        # Human-readable summary report
 ```
 
 ## Notes

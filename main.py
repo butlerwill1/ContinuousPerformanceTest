@@ -15,6 +15,7 @@ from webcam_tracker import WebcamTracker
 from tracking_logger import TrackingLogger
 from questionnaire import PreTestQuestionnaire
 from session_metadata import SessionMetadata
+from summary_report import SummaryReportGenerator
 
 
 class AXCPTGame:
@@ -488,6 +489,10 @@ class AXCPTGame:
             self.logger.save_to_csv(session_dir=self.session_dir)
             self._save_tracking_data()
             self.session_metadata.save_to_csv(self.session_dir)
+
+            # Generate summary report (even when quitting early)
+            if len(self.logger.trials) > 0:
+                self._generate_summary_report()
         else:
             # Fallback if session_dir not set (shouldn't happen)
             self.logger.save_to_csv()
@@ -559,6 +564,34 @@ class AXCPTGame:
         except OSError as e:
             print(f"Warning: Could not rename session folder: {e}")
 
+    def _generate_summary_report(self):
+        """Generate and save human-readable summary report."""
+        if not self.session_dir:
+            return
+
+        # Get performance statistics
+        performance_stats = self.logger.get_summary_stats()
+
+        # Get tracking statistics if available
+        tracking_stats = None
+        if self.tracking_enabled and self.tracking_logger:
+            tracking_stats = self.tracking_logger.calculate_session_summary()
+
+        # Get metadata
+        metadata = self.session_metadata.get_metadata()
+
+        # Generate report
+        report_gen = SummaryReportGenerator(self.session_dir)
+        report = report_gen.generate_report(
+            performance_stats=performance_stats,
+            tracking_stats=tracking_stats,
+            metadata=metadata
+        )
+
+        # Save report
+        filepath = report_gen.save_report(report)
+        print(f"Summary report saved to: {filepath}")
+
     def run(self):
         """Run the complete experiment."""
         try:
@@ -597,6 +630,9 @@ class AXCPTGame:
             self.logger.save_to_csv(session_dir=self.session_dir)
             self._save_tracking_data()
             self.session_metadata.save_to_csv(self.session_dir)
+
+            # Generate summary report
+            self._generate_summary_report()
 
             # Show summary
             self.show_end_screen()

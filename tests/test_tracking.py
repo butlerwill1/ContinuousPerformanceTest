@@ -75,9 +75,9 @@ def test_tracking_basic():
     print(f"   Total frames tracked: {summary['total_frames_tracked']}")
     print(f"   Total trials tracked: {summary['total_trials_tracked']}")
     print(f"   Total blinks: {summary['total_blinks']}")
-    print(f"   Overall blink rate: {summary['overall_blink_rate']:.3f} blinks/sec")
-    print(f"   Mean head stability: {summary['mean_head_stability']:.6f}")
-    print(f"   Engagement score: {summary['engagement_score']:.3f}")
+    print(f"   Blink rate: {summary['blink_rate_per_minute']:.1f} blinks/min")
+    print(f"   Head movement: {summary['mean_head_movement']:.3f}")
+    print(f"   Posture consistency: {summary['posture_consistency']:.3f}")
     print(f"   Fatigue indicator: {summary['fatigue_indicator']:.3f}")
     
     # Cleanup

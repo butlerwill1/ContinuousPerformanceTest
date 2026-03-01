@@ -158,23 +158,23 @@ class TrackingLogger:
         # Convert to blinks per minute for display
         blink_rate_per_minute = overall_blink_rate * 60.0
 
-        # Head stability metrics
-        mean_head_distance = 0.0
-        mean_head_stability = 0.0
+        # Head movement metrics
+        mean_head_movement = 0.0
+        head_movement_variance = 0.0
         if self.session_stats['head_distances']:
-            mean_head_distance = np.mean(self.session_stats['head_distances'])
-            mean_head_stability = np.var(self.session_stats['head_distances'])
+            mean_head_movement = np.mean(self.session_stats['head_distances'])
+            head_movement_variance = np.var(self.session_stats['head_distances'])
 
         # Count total looking away events from trial data
         total_looking_away_events = sum(
             trial.get('looking_away_count', 0) for trial in self.trial_data
         )
 
-        # Engagement score (derived metric: inverse of head movement + blink consistency)
-        # Higher score = better engagement
-        engagement_score = 0.0
-        if mean_head_stability > 0:
-            engagement_score = 1.0 / (1.0 + mean_head_stability)
+        # Posture consistency (derived metric: inverse of head movement variance)
+        # Higher score = better posture consistency
+        posture_consistency = 0.0
+        if head_movement_variance > 0:
+            posture_consistency = 1.0 / (1.0 + head_movement_variance)
 
         # Fatigue indicator: compare first half vs second half blink rates
         fatigue_indicator = 0.0
@@ -192,9 +192,9 @@ class TrackingLogger:
             'total_frames_tracked': self.session_stats['total_frames'],
             'total_trials_tracked': self.session_stats['total_trials_tracked'],
             'blink_rate_per_minute': blink_rate_per_minute,
-            'mean_head_distance': mean_head_distance,
+            'mean_head_movement': mean_head_movement,
             'total_looking_away_events': total_looking_away_events,
-            'engagement_score': engagement_score,
+            'posture_consistency': posture_consistency,
             'fatigue_indicator': fatigue_indicator,
             'session_duration_seconds': total_duration
         }
@@ -206,9 +206,9 @@ class TrackingLogger:
             'total_frames_tracked': 0,
             'total_trials_tracked': 0,
             'blink_rate_per_minute': 0.0,
-            'mean_head_distance': 0.0,
+            'mean_head_movement': 0.0,
             'total_looking_away_events': 0,
-            'engagement_score': 0.0,
+            'posture_consistency': 0.0,
             'fatigue_indicator': 0.0,
             'session_duration_seconds': 0.0
         }
