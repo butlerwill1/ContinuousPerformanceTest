@@ -578,7 +578,7 @@ class AXCPTGame:
             tracking_stats = self.tracking_logger.calculate_session_summary()
 
         # Get metadata
-        metadata = self.session_metadata.get_metadata()
+        metadata = self.session_metadata.metadata
 
         # Generate report
         report_gen = SummaryReportGenerator(self.session_dir)
