@@ -16,6 +16,7 @@ from tracking_logger import TrackingLogger
 from questionnaire import PreTestQuestionnaire
 from session_metadata import SessionMetadata
 from summary_report import SummaryReportGenerator
+from progress_bar import ProgressBar
 
 
 class AXCPTGame:
@@ -38,7 +39,9 @@ class AXCPTGame:
         if self.tracking_enabled:
             self.webcam_tracker = WebcamTracker(
                 enabled=True,
-                camera_index=tracking_config.get("camera_index", 0)
+                camera_index=tracking_config.get("camera_index", 0),
+                capture_fps=tracking_config.get("capture_fps", 30),
+                jpeg_quality=tracking_config.get("jpeg_quality", 85)
             )
             self.tracking_logger = TrackingLogger(enabled=True)
             print("Webcam tracking enabled")
@@ -394,11 +397,9 @@ class AXCPTGame:
         elapsed = 0
 
         while elapsed < total_duration:
-            # Process webcam frame
+            # Capture webcam frame to disk (no processing yet)
             if self.tracking_enabled and self.webcam_tracker:
-                frame_metrics = self.webcam_tracker.process_frame(trial_index)
-                if frame_metrics and self.tracking_logger:
-                    self.tracking_logger.log_frame(frame_metrics)
+                self.webcam_tracker.capture_frame_to_disk(trial_index)
 
             # Handle events
             for event in pygame.event.get():
@@ -441,11 +442,9 @@ class AXCPTGame:
             # Run trial
             response, correct, rt_ms, trial_type, onset = self.run_trial(stimulus, i)
 
-            # Get trial-level tracking data
+            # Don't process tracking data during session
+            # Will be done in post-processing step
             tracking_data = None
-            if self.tracking_enabled and self.webcam_tracker and self.tracking_logger:
-                tracking_data = self.webcam_tracker.end_trial()
-                self.tracking_logger.log_trial(tracking_data)
 
             # Log trial (with tracking data if available)
             self.logger.log_trial(
@@ -478,6 +477,93 @@ class AXCPTGame:
 
                 self.clock.tick(60)
 
+    def _process_captured_frames(self):
+        """
+        Process all captured webcam frames after test completes.
+        This is where the expensive MediaPipe processing happens.
+        """
+        if not self.tracking_enabled or not self.webcam_tracker or not self.tracking_logger:
+            return
+
+        print("\n" + "="*70)
+        print("POST-PROCESSING WEBCAM FRAMES")
+        print("="*70)
+
+        # Show capture stats
+        stats = self.webcam_tracker.get_capture_stats()
+        print(f"\nCaptured {stats['total_frames']} frames")
+        print(f"Estimated size: {stats['estimated_size_mb']:.1f} MB")
+        print(f"Frame rate: {stats['capture_fps']} FPS")
+        print(f"JPEG quality: {stats['jpeg_quality']}")
+
+        # Create progress bar
+        progress_bar = ProgressBar(self.screen, self.bg_color, self.stim_color)
+
+        # Define progress callback
+        def update_progress(current, total, progress_fraction):
+            """Update progress bar during frame processing."""
+            progress_bar.update(progress_fraction, current, total, "Processing Webcam Frames")
+
+        # Process all frames with progress bar
+        all_frame_metrics = self.webcam_tracker.process_all_captured_frames(
+            progress_callback=update_progress
+        )
+
+        if not all_frame_metrics:
+            print("No frames were successfully processed")
+            return
+
+        # Show "Computing trial metrics" progress
+        progress_bar.show(1.0, "Computing Trial Metrics", "Grouping frames by trial...")
+        pygame.time.wait(500)  # Brief pause to show the message
+
+        print(f"\nGrouping frames by trial and computing trial metrics...")
+
+        # Group frames by trial and compute trial-level metrics
+        # Sort by trial_index to ensure correct order
+        all_frame_metrics.sort(key=lambda m: (m.trial_index, m.timestamp))
+
+        current_trial = -1
+        trial_count = 0
+
+        for metrics in all_frame_metrics:
+            # Check if we've moved to a new trial
+            if metrics.trial_index != current_trial:
+                # End previous trial if exists
+                if current_trial >= 0:
+                    trial_data = self.webcam_tracker.end_trial()
+                    self.tracking_logger.log_trial(trial_data)
+                    trial_count += 1
+
+                # Start new trial
+                current_trial = metrics.trial_index
+                self.webcam_tracker.start_trial(current_trial)
+
+            # Add frame to current trial buffer
+            self.webcam_tracker.frame_buffer.append(metrics)
+
+            # Log frame to tracking logger
+            self.tracking_logger.log_frame(metrics)
+
+        # End the last trial
+        if current_trial >= 0:
+            trial_data = self.webcam_tracker.end_trial()
+            self.tracking_logger.log_trial(trial_data)
+            trial_count += 1
+
+        print(f"Computed metrics for {trial_count} trials")
+
+        # Show "Cleaning up" progress
+        progress_bar.show(1.0, "Finalizing", "Cleaning up temporary files...")
+        pygame.time.wait(300)  # Brief pause to show the message
+
+        # Clean up temp frames
+        self.webcam_tracker.cleanup_temp_frames()
+
+        print("\n" + "="*70)
+        print("POST-PROCESSING COMPLETE")
+        print("="*70 + "\n")
+
     def quit_game(self):
         """Save data, show summary, and quit."""
         # Rename folder with actual duration (even if quit early)
@@ -486,6 +572,10 @@ class AXCPTGame:
 
         # Save data to session directory
         if self.session_dir:
+            # Process captured frames before saving
+            if self.tracking_enabled and self.webcam_tracker:
+                self._process_captured_frames()
+
             self.logger.save_to_csv(session_dir=self.session_dir)
             self._save_tracking_data()
             self.session_metadata.save_to_csv(self.session_dir)
@@ -604,6 +694,10 @@ class AXCPTGame:
             shutil.copy('config.json', f'{self.session_dir}/config.json')
             print(f"Session directory created: {self.session_dir}")
 
+            # Set up temp directory for webcam frames
+            if self.tracking_enabled and self.webcam_tracker:
+                self.webcam_tracker.set_temp_directory(self.session_dir)
+
             # Show pre-test questionnaire
             questionnaire = PreTestQuestionnaire(
                 self.screen,
@@ -622,6 +716,10 @@ class AXCPTGame:
             # Run the test
             self.show_instructions()
             self.run_session()
+
+            # Process captured webcam frames
+            if self.tracking_enabled and self.webcam_tracker:
+                self._process_captured_frames()
 
             # Rename folder with actual duration
             self._rename_session_folder_with_duration()

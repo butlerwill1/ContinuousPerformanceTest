@@ -1,8 +1,8 @@
 {
-  "stimulus_duration_ms": 200,
-  "response_window_ms": 700,
-  "inter_stimulus_interval_ms": 500,
-  "session_duration_minutes": 10,
+  "stimulus_duration_ms": 50,
+  "response_window_ms": 500,
+  "inter_stimulus_interval_ms": 50,
+  "session_duration_minutes": 1,
   "target_probability": 0.25,
   "fullscreen": true,
   "font_size": 96,
@@ -17,6 +17,8 @@
   "webcam_tracking": {
     "enabled": true,
     "camera_index": 0,
+    "capture_fps": 30,
+    "jpeg_quality": 85,
     "save_frame_data": true,
     "save_session_summary": true
   }

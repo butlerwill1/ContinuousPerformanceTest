@@ -51,22 +51,24 @@ class SessionMetadata:
     def create_empty_metadata(timestamp: str) -> Dict[str, Any]:
         """
         Create empty metadata dictionary with just timestamp.
-        
+
         Args:
             timestamp: Session timestamp
-            
+
         Returns:
             Dictionary with timestamp and empty fields
         """
         return {
             'timestamp': timestamp,
             'adhd_med_taken': '',
+            'adhd_med_mg': '',
             'hours_since_med': '',
             'sleep_hours': '',
+            'mental_fatigue': '',
+            'caffeine_mg': '',
             'caffeine_hours_ago': '',
             'exercise_hours_ago': '',
             'stress_level': '',
-            'mental_fatigue': '',
             'notes': ''
         }
 

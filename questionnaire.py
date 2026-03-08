@@ -99,7 +99,19 @@ class PreTestQuestionnaire:
                 # Check if this field depends on a previous answer
                 if 'depends_on' in field:
                     dep_key = field['depends_on']
-                    if responses.get(dep_key, '').lower() not in ['y', 'yes']:
+                    dep_value = responses.get(dep_key, '')
+
+                    # Check if dependency is satisfied
+                    # For string values (yes/no), check for 'y' or 'yes'
+                    # For numeric values, check if non-empty and non-zero
+                    should_skip = False
+                    if isinstance(dep_value, str):
+                        should_skip = dep_value.lower() not in ['y', 'yes']
+                    else:
+                        # For numbers or other types, skip if empty or zero
+                        should_skip = not dep_value or dep_value == 0
+
+                    if should_skip:
                         responses[field['key']] = ''
                         continue
                 
